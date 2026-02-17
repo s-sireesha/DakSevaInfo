@@ -4,14 +4,23 @@ node_modules/
 # Environment and secrets (never commit)
 .env
 .env.local
-.env.*.local
 .env.development
 .env.production
-.env.test
+.env.*.local
 *.env
 
+# React Native / Metro
+.expo/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
 # Logs
-logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -27,12 +36,22 @@ Thumbs.db
 *.swp
 *.swo
 
-# Build / output
-dist/
+# Build / coverage
 build/
 coverage/
 *.tgz
 
-# Optional
-*.pid
-*.seed
+# Android
+*.apk
+*.aab
+*.dex
+.gradle/
+local.properties
+
+# iOS
+*.ipa
+*.dSYM.zip
+*.dSYM
+Pods/
+*.xcworkspace
+!default.xcworkspace
