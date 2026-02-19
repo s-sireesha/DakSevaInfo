@@ -5,7 +5,7 @@ const FormSubmit = () => {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    API.get("/categories")
+    API.get("/forms/:id")
       .then((res) => setCategories(res.data))
       .catch((err) => console.log(err));
   }, []);

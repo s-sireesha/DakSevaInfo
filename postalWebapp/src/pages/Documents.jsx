@@ -5,7 +5,7 @@ const Documents = () => {
   const [categories, setCategories] = useState([]);
 
   useEffect(() => {
-    API.get("/categories")
+    API.get("/documents")
       .then((res) => setCategories(res.data))
       .catch((err) => console.log(err));
   }, []);
