@@ -1,0 +1,76 @@
+# React Native dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+*.log
+*.tmp
+*.swp
+
+# Yarn or npm (choose only one lock file to keep in Git)
+package-lock.json
+
+# Metro / Expo
+.expo/
+.expo-shared/
+*.expo
+*.expo.*
+metro-cache/
+cache/
+tmp/
+.watchmanconfig
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Environment and sensitive files
+.env
+.env.*
+*.jks
+*.p8
+*.p12
+*.key
+*.crt
+
+# Android build artifacts and generated files
+/android/.gradle/
+/android/.idea/
+/android/app/.cxx/
+/android/app/build/
+/android/build/
+/android/local.properties
+android/app/src/main/assets/
+android/app/src/main/res/drawable-*
+android/app/src/main/res/raw/*
+android/.kotlin/
+android/app/release/
+!android/app/debug.keystore
+
+# iOS build and user-specific files
+ios/Pods/
+ios/build/
+/ios/.xcode.env
+/ios/.xcode.env.local
+ios/*.xcworkspace
+ios/*.xcodeproj/project.xcworkspace/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcuserdata/
+ios/DerivedData/
+ios/.DS_Store
+ios/SDKToSimulatorIndexMapping.plist
+
+# Xcode state
+*.xcuserstate
+
+# VS Code
+.vscode/
+
+# Fastlane
+fastlane/report.xml
+fastlane/screenshots
+fastlane/test_output
+
+# Ruby vendor
+/vendor/bundle/
+/vendor/cache/
+/vendor/ruby/

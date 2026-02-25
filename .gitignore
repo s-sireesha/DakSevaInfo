@@ -1,9 +1,0 @@
-# Root-level ignores (each project folder has its own .gitignore too)
-.DS_Store
-Thumbs.db
-*.log
-.idea/
-.vscode/
-*.env
-.env
-.env.*
