@@ -1,0 +1,261 @@
+/* Jotform / Google Docs style inline form editor */
+
+.inline-form-builder-wrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.inline-editor-loading,
+.inline-editor-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-mid);
+}
+
+.inline-editor-empty p {
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.inline-form-editor-panel {
+  flex: 1;
+  padding: 24px 32px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.inline-form-doc {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(13, 27, 42, 0.06);
+  overflow: visible;
+}
+
+.inline-form-title-input {
+  width: 100%;
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--navy);
+  border: none;
+  border-bottom: 1px solid transparent;
+  padding: 20px 24px 8px;
+  background: var(--white);
+  outline: none;
+}
+
+.inline-form-title-input::placeholder {
+  color: var(--text-light);
+}
+
+.inline-form-description {
+  font-size: 13px;
+  color: var(--text-light);
+  padding: 0 24px 16px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Toolbar: A | + Add field ▼ */
+.inline-form-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--ivory);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.inline-toolbar-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-mid);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: default;
+}
+
+.inline-toolbar-add-field {
+  position: relative;
+}
+
+.inline-toolbar-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--navy);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Source Sans 3', sans-serif;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+
+.inline-toolbar-add-btn:hover {
+  border-color: var(--navy);
+  background: var(--white);
+}
+
+.inline-toolbar-arrow {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.inline-toolbar-dropdown-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+}
+
+.inline-toolbar-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  min-width: 200px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(13, 27, 42, 0.15);
+  z-index: 20;
+  padding: 6px 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.inline-toolbar-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text-dark);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'Source Sans 3', sans-serif;
+  text-align: left;
+  transition: background 0.1s;
+}
+
+.inline-toolbar-dropdown-item:hover {
+  background: var(--ivory);
+}
+
+.inline-toolbar-dropdown-icon {
+  font-size: 16px;
+  width: 24px;
+  text-align: center;
+}
+
+/* Content area with blue border (like screenshot) */
+.inline-form-content-wrap {
+  margin: 0 24px 24px;
+  border: 2px solid #2196f3;
+  border-radius: 8px;
+  background: #fafbff;
+  min-height: 220px;
+}
+
+.inline-form-content-wrap .ProseMirror {
+  padding: 16px 20px;
+  min-height: 200px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-dark);
+}
+
+.inline-form-content-wrap .ProseMirror p {
+  margin-bottom: 10px;
+}
+
+.inline-form-content-wrap .ProseMirror p:last-child {
+  margin-bottom: 0;
+}
+
+.inline-form-content-wrap .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--text-light);
+  pointer-events: none;
+  height: 0;
+}
+
+/* Inline field chips (inside the text flow) */
+.inline-field-chip {
+  display: inline-flex;
+  align-items: center;
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #2196f3;
+  font-size: 13px;
+  margin: 0 2px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.inline-field-chip-label {
+  font-weight: 500;
+}
+
+.inline-form-actions {
+  padding: 16px 24px 24px;
+  border-top: 1px solid var(--border);
+}
+
+/* Embedded in FormBuilder canvas */
+.form-canvas .inline-form-doc {
+  box-shadow: none;
+  border: none;
+}
+
+.form-canvas .inline-form-editor-panel {
+  max-width: none;
+  padding: 0;
+}
+
+.form-canvas .inline-form-title-input {
+  font-size: 18px;
+  padding: 12px 16px;
+}
+
+.form-canvas .inline-form-content-wrap {
+  margin: 0 16px 16px;
+  min-height: 180px;
+}
+
+.form-canvas .inline-form-content-wrap .ProseMirror {
+  min-height: 160px;
+  padding: 12px 16px;
+}
+
+.form-canvas .inline-form-toolbar {
+  padding: 8px 16px;
+}
+
+.form-canvas .inline-form-description {
+  padding: 0 16px 12px;
+  font-size: 12px;
+}
+
+.form-canvas .inline-form-actions {
+  padding: 12px 16px;
+}

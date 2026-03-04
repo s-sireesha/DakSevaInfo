@@ -1,419 +1,368 @@
-import { useEffect, useState, useRef } from "react";
-import { Link } from "react-router-dom";
-import API from "../api/axios";
+import { useEffect, useState, useCallback } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { getFormById, updateForm } from "../services/postalApi";
+import RichFormBuilder from "../components/editor/RichFormBuilder";
 import "../styles/GovFormBuilder.css";
+import "../styles/InlineFormEditor.css";
 
-const FormBuilder = () => {
-  const [categories, setCategories] = useState([]);
-    const [selectedForm, setSelectedForm] = useState("Birth Certificate");
-    const [selectedRow, setSelectedRow] = useState(0);
-      const [toast, setToast] = useState(null);
-        const [activeTab, setActiveTab] = useState("Build");
-        const [formFields, setFormFields] = useState([
-          { type: "TEXT", label: "Full Name of Child", required: true },
-          { type: "DATE", label: "Date of Birth", required: true },
-          { type: "RADIO", label: "Gender", required: true },
-          { type: "TEXT", label: "Father's Full Name", required: true },
-          { type: "TEXT", label: "Mother's Full Name", required: true },
-          { type: "DROPDOWN", label: "Place of Birth (Hospital/Home)", required: false },
-          { type: "FILE", label: "Hospital Discharge Certificate", required: true },
-        ]);
-        const builderPanelRef = useRef(null);
-      
-        const showToastMsg = (msg) => {
-          setToast(msg);
-          setTimeout(() => setToast(null), 3000);
-        };
-  useEffect(() => {
-    API.get("/forms/new")
-      .then((res) => setCategories(res.data))
-      .catch((err) => console.log(err));
-  }, []);
+// Field types matching backend enum: text, number, date, textarea, select, radio, file
+const FIELD_PALETTE = [
+  { label: "Text Input", type: "text", icon: "T" },
+  { label: "Text Area", type: "textarea", icon: "¶" },
+  { label: "Number", type: "number", icon: "#" },
+  { label: "Date", type: "date", icon: "📅" },
+  { label: "Dropdown", type: "select", icon: "▾" },
+  { label: "Radio Group", type: "radio", icon: "◉" },
+  { label: "File Upload", type: "file", icon: "📎" },
+];
 
-    const removeField = (index) => {
-    setFormFields((prev) => prev.filter((_, i) => i !== index));
-    setSelectedRow((prev) => (prev >= index && prev > 0 ? prev - 1 : prev));
+const DEFAULT_LABEL_BY_TYPE = {
+  text: "Text field",
+  textarea: "Long text",
+  number: "Number",
+  date: "Date",
+  select: "Dropdown",
+  radio: "Radio choice",
+  file: "File upload",
+};
+
+function FormBuilder() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(!!id);
+  const [formName, setFormName] = useState("");
+  const [formFields, setFormFields] = useState([]);
+  const [selectedRow, setSelectedRow] = useState(-1);
+  const [activeTab, setActiveTab] = useState("Write");
+  const [toast, setToast] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [writeTabKey, setWriteTabKey] = useState(0);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
   };
 
+  const loadForm = useCallback(async (formId) => {
+    try {
+      setLoading(true);
+      const res = await getFormById(formId);
+      const form = res.data;
+      setFormName(form.formName || "Untitled Form");
+      setFormFields(Array.isArray(form.fields) && form.fields.length > 0
+        ? form.fields.map((f) => ({
+            label: f.label || "Field",
+            type: (f.type || "text").toLowerCase(),
+            required: !!f.required,
+          }))
+        : []);
+      setSelectedRow(-1);
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to load form");
+      navigate("/");
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (id && id !== "new") {
+      loadForm(id);
+    } else if (id === "new" || !id) {
+      setLoading(false);
+      setFormName("New Form");
+      setFormFields([]);
+    }
+  }, [id, loadForm]);
+
+  const addField = (type) => {
+    const label = DEFAULT_LABEL_BY_TYPE[type] || "New field";
+    const newField = { label, type, required: false };
+    setFormFields((prev) => [...prev, newField]);
+    setSelectedRow(formFields.length);
+  };
+
+  const removeField = (index) => {
+    setFormFields((prev) => prev.filter((_, i) => i !== index));
+    setSelectedRow((prev) => (prev >= index && prev > 0 ? prev - 1 : prev === index ? -1 : prev));
+  };
+
+  const moveField = (index, direction) => {
+    if (direction === "up" && index <= 0) return;
+    if (direction === "down" && index >= formFields.length - 1) return;
+    const next = [...formFields];
+    const j = direction === "up" ? index - 1 : index + 1;
+    [next[index], next[j]] = [next[j], next[index]];
+    setFormFields(next);
+    setSelectedRow(j);
+  };
+
+  const duplicateField = (index) => {
+    const field = formFields[index];
+    const copy = { ...field, label: `${field.label} (copy)` };
+    setFormFields((prev) => [...prev.slice(0, index + 1), copy, ...prev.slice(index + 1)]);
+    setSelectedRow(index + 1);
+  };
+
+  const updateField = (index, updates) => {
+    setFormFields((prev) =>
+      prev.map((f, i) => (i === index ? { ...f, ...updates } : f))
+    );
+  };
+
+  const handleSaveDraft = async () => {
+    if (!id || id === "new") {
+      showToast("Save from Dashboard: create a form first.");
+      return;
+    }
+    try {
+      setSaving(true);
+      await updateForm(id, { formName, fields: formFields });
+      showToast("💾 Draft saved");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleInlineSave = async ({ formName: name, fields }) => {
+    if (!id || id === "new") return;
+    setFormName(name);
+    setFormFields(fields);
+    setWriteTabKey((k) => k + 1);
+    try {
+      setSaving(true);
+      await updateForm(id, { formName: name, fields });
+      showToast("💾 Form saved");
+    } catch (err) {
+      console.error(err);
+      showToast("Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectedField = selectedRow >= 0 && formFields[selectedRow] ? formFields[selectedRow] : null;
+
+  if (loading) {
+    return (
+      <div className="gov-app" style={{ padding: 40, textAlign: "center" }}>
+        <p>Loading form...</p>
+      </div>
+    );
+  }
+
+  if (!id || id === "new") {
+    return (
+      <div className="gov-app" style={{ padding: 40, textAlign: "center" }}>
+        <p>Create a form from the Dashboard first, then you can build it here.</p>
+        <Link to="/">Go to Dashboard</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="gov-app">
+      {toast && <div className="toast">{toast}</div>}
       <div className="topbar">
         <div className="topbar-title">
-          <Link to="/" className="back-link" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}>
+          <Link
+            to="/"
+            className="back-link"
+            style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}
+          >
             <span aria-hidden>←</span>
             <span>Dashboard</span>
           </Link>
         </div>
         <div className="topbar-actions">
-          <span className="section-label" style={{ margin: 0 }}>Form Builder — {selectedForm}</span>
+          <span className="section-label" style={{ margin: 0 }}>
+            Form Builder — {formName}
+          </span>
         </div>
       </div>
-      <div className="builder-panel" ref={builderPanelRef}>
-             <div className="builder-tabs">
-              {["Build", "Preview", "Settings", "Logic"].map((tab, i) => (
+
+      <div className="builder-panel">
+        <div className="builder-tabs">
+          {["Write", "Build", "Preview", "Settings", "Logic"].map((tab, i) => (
+            <div
+              key={tab}
+              className={`builder-tab ${activeTab === tab ? "active" : ""}`}
+              onClick={() => setActiveTab(tab)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && setActiveTab(tab)}
+            >
+              {["✎", "🔧", "👁", "⚙️", "🔗"][i]} {tab}
+            </div>
+          ))}
+          <div style={{ flex: 1 }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 16px" }}>
+            <button
+              type="button"
+              className="btn-action btn-outline"
+              style={{ border: "1px solid #d5cec0", padding: "7px 14px", fontSize: "12px" }}
+              onClick={handleSaveDraft}
+              disabled={saving}
+            >
+              {saving ? "Saving…" : "Save Draft"}
+            </button>
+            <button
+              type="button"
+              className="btn-action btn-navy"
+              style={{ padding: "7px 14px", fontSize: "12px" }}
+              onClick={() => showToast("🚀 Form published successfully!")}
+            >
+              Publish
+            </button>
+          </div>
+        </div>
+
+        <div className="builder-body">
+          {activeTab === "Write" ? (
+            <div className="form-canvas" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+              <RichFormBuilder
+                key={writeTabKey}
+                formId={id}
+                formName={formName}
+                initialFields={formFields}
+                onSave={handleInlineSave}
+                embedded
+              />
+            </div>
+          ) : (
+            <>
+          {/* Field palette */}
+          <div className="field-palette">
+            <div className="palette-label">Add fields</div>
+            {FIELD_PALETTE.map((item) => (
+              <div
+                key={item.type}
+                className="field-chip"
+                onClick={() => addField(item.type)}
+                onKeyDown={(e) => e.key === "Enter" && addField(item.type)}
+                role="button"
+                tabIndex={0}
+                title={`Add ${item.label}`}
+              >
+                <span className="field-chip-icon">{item.icon}</span> {item.label}
+              </div>
+            ))}
+          </div>
+
+          {/* Canvas */}
+          <div className="form-canvas">
+            <div className="canvas-form-title">
+              <input
+                type="text"
+                value={formName}
+                onChange={(e) => setFormName(e.target.value)}
+                className="canvas-form-title-input"
+                placeholder="Form title"
+              />
+              <span>Form ID: {id}</span>
+            </div>
+
+            {formFields.map((field, index) => (
+              <div
+                key={`${field.label}-${index}`}
+                className={`form-field-row ${selectedRow === index ? "selected" : ""}`}
+                onClick={() => setSelectedRow(index)}
+              >
+                <span className="field-drag-handle">⠿</span>
+                <span className="field-type-badge">{field.type}</span>
+                <span className="field-label">{field.label}</span>
+                <span
+                  className="field-required"
+                  style={!field.required ? { color: "transparent" } : undefined}
+                >
+                  *
+                </span>
+                <div className="field-actions">
+                  <button
+                    type="button"
+                    className="field-btn"
+                    title="Move up"
+                    onClick={(e) => { e.stopPropagation(); moveField(index, "up"); }}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="field-btn"
+                    title="Move down"
+                    onClick={(e) => { e.stopPropagation(); moveField(index, "down"); }}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    className="field-btn"
+                    title="Duplicate"
+                    onClick={(e) => { e.stopPropagation(); duplicateField(index); }}
+                  >
+                    ⧉
+                  </button>
+                  <button
+                    type="button"
+                    className="field-btn"
+                    title="Delete"
+                    onClick={(e) => { e.stopPropagation(); removeField(index); }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div className="drop-zone">
+              ⊕ Click a field type on the left to add it here
+            </div>
+          </div>
+
+          {/* Properties panel */}
+          <div className="props-panel">
+            <div className="props-label">Field properties</div>
+            {selectedField ? (
+              <>
+                <div className="prop-row">
+                  <label>Field label</label>
+                  <input
+                    className="prop-input"
+                    value={selectedField.label}
+                    onChange={(e) => updateField(selectedRow, { label: e.target.value })}
+                  />
+                </div>
+                <div className="prop-row">
+                  <label>Type</label>
+                  <input className="prop-input" value={selectedField.type} readOnly />
+                </div>
+                <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
+                <div className="toggle-row">
+                  <span>Required</span>
                   <div
-                    key={tab}
-                    className={`builder-tab ${activeTab === tab ? "active" : ""}`}
-                    onClick={() => setActiveTab(tab)}
+                    className={`toggle ${selectedField.required ? "on" : ""}`}
                     role="button"
                     tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && setActiveTab(tab)}
-                  >
-                    {["🔧", "👁", "⚙️", "🔗"][i]} {tab}
-                  </div>
-                ))}
-                <div style={{ flex: 1 }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 16px" }}>
-                  <button type="button" className="btn-action btn-outline" style={{ border: "1px solid #d5cec0", padding: "7px 14px", fontSize: "12px" }} onClick={() => showToastMsg("💾 Draft saved")}>Save Draft</button>
-                  <button type="button" className="btn-action btn-navy" style={{ padding: "7px 14px", fontSize: "12px" }} onClick={() => showToastMsg("🚀 Form published successfully!")}>Publish</button>
+                    onClick={() => updateField(selectedRow, { required: !selectedField.required })}
+                    onKeyDown={(e) => e.key === "Enter" && updateField(selectedRow, { required: !selectedField.required })}
+                    aria-pressed={selectedField.required}
+                  />
                 </div>
-              </div>
-
-              <div className="builder-body">
-                {/* Field palette */}
-                <div className="field-palette">
-                  <div className="palette-label">Basic</div>
-                  <div className="field-chip" title="Drag to add">
-                    <span className="field-chip-icon">T</span> Text Input
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">¶</span> Text Area
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">#</span> Number
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">📅</span> Date
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">📧</span> Email
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">📞</span> Phone
-                  </div>
-
-                  <div className="palette-label">Selection</div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">▾</span> Dropdown
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">◉</span> Radio Group
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">☑</span> Checkbox
-                  </div>
-
-                  <div className="palette-label">Advanced</div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">📎</span> File Upload
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">✍</span> Signature
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">—</span> Divider
-                  </div>
-                  <div className="field-chip">
-                    <span className="field-chip-icon">ℹ</span> Info Block
-                  </div>
-                </div>
-
-                {/* Canvas */}
-                <div className="form-canvas">
-                  <div className="canvas-form-title">
-                    {selectedForm}
-                    <span>Form ID: GOV-CIV-001</span>
-                  </div>
-
-                  {formFields.map((field, index) => (
-                    <div
-                      key={`${field.label}-${index}`}
-                      className={`form-field-row ${selectedRow === index ? "selected" : ""}`}
-                      onClick={() => setSelectedRow(index)}
-                    >
-                      <span className="field-drag-handle">⠿</span>
-                      <span className="field-type-badge">{field.type}</span>
-                      <span className="field-label">{field.label}</span>
-                      <span className="field-required" style={!field.required ? { color: "transparent" } : undefined}>*</span>
-                      <div className="field-actions">
-                        <button type="button" className="field-btn" title="Move up">↑</button>
-                        <button type="button" className="field-btn" title="Move down">↓</button>
-                        <button type="button" className="field-btn" title="Duplicate">⧉</button>
-                        <button type="button" className="field-btn" title="Delete" onClick={(e) => { e.stopPropagation(); removeField(index); }}>✕</button>
-                      </div>
-                    </div>
-                  ))}
-
-                  <div className="drop-zone">⊕ Drag a field here or click a field type from the left panel</div>
-                </div>
-
-                {/* Properties panel */}
-                <div className="props-panel">
-                  <div className="props-label">Field Properties</div>
-
-                  <div className="prop-row">
-                    <label>Field Label</label>
-                    <input className="prop-input" defaultValue="Full Name of Child" readOnly={false} />
-                  </div>
-
-                  <div className="prop-row">
-                    <label>Placeholder Text</label>
-                    <input className="prop-input" defaultValue="Enter full name as per Aadhaar" readOnly={false} />
-                  </div>
-
-                  <div className="prop-row">
-                    <label>Help Text</label>
-                    <input className="prop-input" defaultValue="Name should match hospital records" readOnly={false} />
-                  </div>
-
-                  <div className="prop-row">
-                    <label>Max Length</label>
-                    <input className="prop-input" type="number" defaultValue={100} readOnly={false} />
-                  </div>
-
-                  <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
-
-                  <div className="toggle-row">
-                    <span>Required</span>
-                    <div className="toggle on" role="button" tabIndex={0} onClick={(e) => e.currentTarget.classList.toggle("on")} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.classList.toggle("on")} />
-                  </div>
-                  <div className="toggle-row">
-                    <span>Read Only</span>
-                    <div className="toggle" role="button" tabIndex={0} onClick={(e) => e.currentTarget.classList.toggle("on")} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.classList.toggle("on")} />
-                  </div>
-                  <div className="toggle-row">
-                    <span>Hidden</span>
-                    <div className="toggle" role="button" tabIndex={0} onClick={(e) => e.currentTarget.classList.toggle("on")} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.classList.toggle("on")} />
-                  </div>
-                  <div className="toggle-row">
-                    <span>Print Visible</span>
-                    <div className="toggle on" role="button" tabIndex={0} onClick={(e) => e.currentTarget.classList.toggle("on")} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.classList.toggle("on")} />
-                  </div>
-
-                  <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
-
-                  <div className="prop-row">
-                    <label>Validation Pattern</label>
-                    <input className="prop-input" defaultValue="[A-Za-z\\s]+" readOnly={false} />
-                  </div>
-                </div>
-              </div>
-            </div>
+              </>
+            ) : (
+              <p className="prop-hint">Select a field to edit its properties.</p>
+            )}
+          </div>
+            </>
+          )}
+        </div>
       </div>
+    </div>
   );
-};
+}
 
 export default FormBuilder;
-
-
-// import React, { forwardRef } from "react";
-
-// const FormBuilder = forwardRef(({
-//   selectedForm,
-//   formFields,
-//   setFormFields,
-//   selectedRow,
-//   setSelectedRow,
-//   activeTab,
-//   setActiveTab,
-// }, ref) => {
-
-//   const removeField = (index) => {
-//     setFormFields((prev) => prev.filter((_, i) => i !== index));
-//   };
-
-//   return (
-//     <div className="builder-panel" ref={ref}>
-//       <div className="builder-tabs">
-//         {["Build", "Preview", "Settings", "Logic"].map((tab) => (
-//           <div
-//             key={tab}
-//             className={`builder-tab ${activeTab === tab ? "active" : ""}`}
-//             onClick={() => setActiveTab(tab)}
-//           >
-//             {tab}
-//           </div>
-//         ))}
-//       </div>
-
-//       <div className="form-canvas">
-//         <div className="canvas-form-title">
-//           {selectedForm}
-//         </div>
-
-//         {formFields.map((field, index) => (
-//           <div
-//             key={index}
-//             className={`form-field-row ${
-//               selectedRow === index ? "selected" : ""
-//             }`}
-//             onClick={() => setSelectedRow(index)}
-//           >
-//             <span>{field.type}</span>
-//             <span>{field.label}</span>
-//             <button onClick={() => removeField(index)}>✕</button>
-//           </div>
-//         ))}
-//       </div>
-//     </div>
-//   );
-// });
-
-// export default FormBuilder;
-
-
-
-
-  //  <div className="section-label">Form Builder — {selectedForm}</div>
-  //           <div className="builder-panel" ref={builderPanelRef}>
-  //             <div className="builder-tabs">
-  //               {["Build", "Preview", "Settings", "Logic"].map((tab, i) => (
-  //                 <div
-  //                   key={tab}
-  //                   className={`builder-tab ${activeTab === tab ? "active" : ""}`}
-  //                   onClick={() => setActiveTab(tab)}
-  //                   role="button"
-  //                   tabIndex={0}
-  //                   onKeyDown={(e) => e.key === "Enter" && setActiveTab(tab)}
-  //                 >
-  //                   {["🔧", "👁", "⚙️", "🔗"][i]} {tab}
-  //                 </div>
-  //               ))}
-  //               <div style={{ flex: 1 }} />
-  //               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 16px" }}>
-  //                 <button type="button" className="btn-action btn-outline" style={{ border: "1px solid #d5cec0", padding: "7px 14px", fontSize: "12px" }} onClick={() => showToastMsg("💾 Draft saved")}>Save Draft</button>
-  //                 <button type="button" className="btn-action btn-navy" style={{ padding: "7px 14px", fontSize: "12px" }} onClick={() => showToastMsg("🚀 Form published successfully!")}>Publish</button>
-  //               </div>
-  //             </div>
-
-  //             <div className="builder-body">
-  //               {/* Field palette */}
-  //               <div className="field-palette">
-  //                 <div className="palette-label">Basic</div>
-  //                 <div className="field-chip" title="Drag to add">
-  //                   <span className="field-chip-icon">T</span> Text Input
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">¶</span> Text Area
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">#</span> Number
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">📅</span> Date
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">📧</span> Email
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">📞</span> Phone
-  //                 </div>
-
-  //                 <div className="palette-label">Selection</div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">▾</span> Dropdown
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">◉</span> Radio Group
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">☑</span> Checkbox
-  //                 </div>
-
-  //                 <div className="palette-label">Advanced</div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">📎</span> File Upload
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">✍</span> Signature
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">—</span> Divider
-  //                 </div>
-  //                 <div className="field-chip">
-  //                   <span className="field-chip-icon">ℹ</span> Info Block
-  //                 </div>
-  //               </div>
-
-  //               {/* Canvas */}
-  //               <div className="form-canvas">
-  //                 <div className="canvas-form-title">
-  //                   {selectedForm}
-  //                   <span>Form ID: GOV-CIV-001</span>
-  //                 </div>
-
-  //                 {formFields.map((field, index) => (
-  //                   <div
-  //                     key={`${field.label}-${index}`}
-  //                     className={`form-field-row ${selectedRow === index ? "selected" : ""}`}
-  //                     onClick={() => setSelectedRow(index)}
-  //                   >
-  //                     <span className="field-drag-handle">⠿</span>
-  //                     <span className="field-type-badge">{field.type}</span>
-  //                     <span className="field-label">{field.label}</span>
-  //                     <span className="field-required" style={!field.required ? { color: "transparent" } : undefined}>*</span>
-  //                     <div className="field-actions">
-  //                       <button type="button" className="field-btn" title="Move up">↑</button>
-  //                       <button type="button" className="field-btn" title="Move down">↓</button>
-  //                       <button type="button" className="field-btn" title="Duplicate">⧉</button>
-  //                       <button type="button" className="field-btn" title="Delete" onClick={(e) => { e.stopPropagation(); removeField(index); }}>✕</button>
-  //                     </div>
-  //                   </div>
-  //                 ))}
-
-  //                 <div className="drop-zone">⊕ Drag a field here or click a field type from the left panel</div>
-  //               </div>
-
-  //               {/* Properties panel */}
-  //               <div className="props-panel">
-  //                 <div className="props-label">Field Properties</div>
-
-  //                 <div className="prop-row">
-  //                   <label>Field Label</label>
-  //                   <input className="prop-input" defaultValue="Full Name of Child" readOnly={false} />
-  //                 </div>
-
-  //                 <div className="prop-row">
-  //                   <label>Placeholder Text</label>
-  //                   <input className="prop-input" defaultValue="Enter full name as per Aadhaar" readOnly={false} />
-  //                 </div>
-
-  //                 <div className="prop-row">
-  //                   <label>Help Text</label>
-  //                   <input className="prop-input" defaultValue="Name should match hospital records" readOnly={false} />
-  //                 </div>
-
-  //                 <div className="prop-row">
-  //                   <label>Max Length</label>
-  //                   <input className="prop-input" type="number" defaultValue={100} readOnly={false} />
-  //                 </div>
-
-  //                 <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
-
-  //                 <div className="toggle-row">
-  //                   <span>Required</span>
-  //                   <div className="toggle on" role="button" tabIndex={0} onClick={(e) => e.currentTarget.classList.toggle("on")} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.classList.toggle("on")} />
-  //                 </div>
-  //                 <div className="toggle-row">
-  //                   <span>Read Only</span>
-  //                   <div className="toggle" role="button" tabIndex={0} onClick={(e) => e.currentTarget.classList.toggle("on")} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.classList.toggle("on")} />
-  //                 </div>
-  //                 <div className="toggle-row">
-  //                   <span>Hidden</span>
-  //                   <div className="toggle" role="button" tabIndex={0} onClick={(e) => e.currentTarget.classList.toggle("on")} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.classList.toggle("on")} />
-  //                 </div>
-  //                 <div className="toggle-row">
-  //                   <span>Print Visible</span>
-  //                   <div className="toggle on" role="button" tabIndex={0} onClick={(e) => e.currentTarget.classList.toggle("on")} onKeyDown={(e) => e.key === "Enter" && e.currentTarget.classList.toggle("on")} />
-  //                 </div>
-
-  //                 <div style={{ height: 1, background: "var(--border)", margin: "14px 0" }} />
-
-  //                 <div className="prop-row">
-  //                   <label>Validation Pattern</label>
-  //                   <input className="prop-input" defaultValue="[A-Za-z\\s]+" readOnly={false} />
-  //                 </div>
-  //               </div>
-  //             </div>
-  //           </div>

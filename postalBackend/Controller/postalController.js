@@ -87,9 +87,20 @@ export const getFormById = async (req, res) => {
   }
 };
 
-
-
-// ================= FORM SUBMISSION =================
+// Update Form (e.g. form name, fields)
+export const updateForm = async (req, res) => {
+  try {
+    const form = await Form.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    if (!form) return res.status(404).json({ error: "Form not found" });
+    res.json(form);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
 export const submitForm = async (req, res) => {
   try {
     const { userId, filledData } = req.body;

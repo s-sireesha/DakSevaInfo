@@ -54,12 +54,23 @@
     padding: 14px 24px;
     flex: 1;
     display: flex;
-    /* justify-content: center; */
     align-items: center;
     gap: 15px;
+    min-width: 0;
   }
 
-  .topbar-title h1 {
+  .topbar-title .brand-logo {
+    height: 48px;
+    width: auto;
+    max-width: 200px;
+    object-fit: contain;
+    object-position: left center;
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .topbar-title .brand-title {
+    margin: 0;
     font-family: 'Playfair Display', serif;
     color: var(--white);
     font-size: 19px;
@@ -83,6 +94,41 @@
     gap: 12px;
     padding: 14px 24px;
     margin-left: auto;
+  }
+
+  .role-switcher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 8px;
+    padding-right: 12px;
+    border-right: 1px solid rgba(255,255,255,0.25);
+  }
+  .role-label {
+    font-size: 12px;
+    color: var(--gold-light);
+    font-weight: 500;
+  }
+  .btn-role {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: 'Source Sans 3', sans-serif;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: transparent;
+    color: rgba(255,255,255,0.8);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+  .btn-role:hover {
+    border-color: var(--gold);
+    color: var(--gold-light);
+  }
+  .btn-role.active {
+    background: var(--gold);
+    color: var(--navy);
+    border-color: var(--gold);
   }
 
   .btn-primary {
@@ -540,6 +586,16 @@
     align-items: center;
     justify-content: space-between;
   }
+  .canvas-form-title-input {
+    flex: 1;
+    max-width: 70%;
+    font: inherit;
+    color: inherit;
+    border: none;
+    background: transparent;
+    outline: none;
+  }
+  .canvas-form-title-input::placeholder { color: var(--text-light); }
 
   .canvas-form-title span { font-family: 'Source Sans 3', sans-serif; font-size: 11px; color: var(--text-light); font-weight: 400; }
 
@@ -640,6 +696,12 @@
     transition: transform 0.2s;
   }
   .toggle.on::after { transform: translateX(16px); }
+
+  .prop-hint {
+    font-size: 12px;
+    color: var(--text-light);
+    margin: 0;
+  }
 
   /* Modal */
   .modal-overlay {

@@ -8,6 +8,7 @@ import {
   createForm,
   getForms,
   getFormById,
+  updateForm,
   submitForm,
   getSubmissionsByUser,
   uploadDocument,
@@ -38,6 +39,7 @@ router.delete("/api/categories/:id", deleteCategory);
 router.post("/api/forms", createForm);
 router.get("/api/forms", getForms);
 router.get("/api/forms/:id", getFormById);
+router.put("/api/forms/:id", updateForm);
 
 
 // FORM SUBMISSION APIs
